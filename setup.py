@@ -5,5 +5,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     python_requires='>=3.6',
     use_scm_version={'write_to': 'prefix/version.py'},
-    setup_requires=['setuptools_scm', 'setuptools_scm_git_archive']
+    setup_requires=['setuptools_scm', 'setuptools_scm_git_archive'],
+    entry_points={
+        'console_scripts': ['prefix=prefix.cli:parse_args']
+    }
 )
