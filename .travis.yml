@@ -1,0 +1,9 @@
+sudo: false
+language: python
+python: "3.6"
+install:
+  - pip install flake8
+  - pip install -e .[testing]
+script:
+  - flake8
+  - pytest
