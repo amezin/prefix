@@ -7,8 +7,8 @@ import urllib.parse
 
 import pytest
 
+from prefix.tarball import Tarball
 from prefix.workspace import Workspace
-from prefix.scm.tarball import Tarball
 
 
 class ArchiveFixture:

@@ -4,8 +4,7 @@ import shlex
 import subprocess
 import sys
 
-from prefix.scm.dir import SourceDir, Option
-
+from prefix.source_dir import SourceDir, Option
 
 LOG = logging.getLogger(__name__)
 

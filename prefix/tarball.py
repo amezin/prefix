@@ -5,8 +5,7 @@ import shutil
 import urllib.parse
 import urllib.request
 
-from prefix.scm.dir import SourceDir, Option
-
+from prefix.source_dir import SourceDir, Option
 
 CACHE_FILENAME_PATTERN = re.compile(r'[^-._\d\w]', re.ASCII)
 

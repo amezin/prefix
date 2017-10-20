@@ -3,7 +3,7 @@ import pathlib
 
 import pytest
 
-from prefix.scm.git import GitTool, GitRepo
+from prefix.git import GitTool, GitRepo
 
 
 class GitFixture(GitTool):
