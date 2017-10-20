@@ -7,6 +7,7 @@ import urllib.parse
 
 import pytest
 
+from prefix.workspace import Workspace
 from prefix.scm.tarball import Tarball
 
 
@@ -83,40 +84,40 @@ def target_dir(tmpdir):
 
 
 @pytest.fixture
-def cache_dir(tmpdir):
-    return pathlib.Path(tmpdir) / 'cache'
+def workspace(tmpdir):
+    return Workspace(cache_dir=pathlib.Path(tmpdir) / 'cache')
 
 
-def test_local_extract_uri(source_archive, target_dir, cache_dir):
+def test_local_extract_uri(source_archive, target_dir, workspace):
     (source_archive.dir / 'test.txt').write_text('TEST')
     archive = source_archive.make_archive()
 
-    Tarball(source_dir=target_dir, url=archive.as_uri()).update(cache_dir)
+    Tarball(source_dir=target_dir, url=archive.as_uri(), workspace=workspace).update()
 
-    assert not cache_dir.exists()
+    assert not workspace.cache_dir.exists()
     assert (target_dir / 'test.txt').read_text() == 'TEST'
 
 
-def test_local_extract_file(source_archive, target_dir, cache_dir):
+def test_local_extract_file(source_archive, target_dir, workspace):
     (source_archive.dir / 'test.txt').write_text('TEST')
     archive = source_archive.make_archive()
 
-    Tarball(source_dir=target_dir, url=archive.as_uri()).update(cache_dir)
+    Tarball(source_dir=target_dir, url=archive.as_uri(), workspace=workspace).update()
 
-    assert not cache_dir.exists()
+    assert not workspace.cache_dir.exists()
     assert (target_dir / 'test.txt').read_text() == 'TEST'
 
 
-def test_http_download(http_source_archive, target_dir, cache_dir):
+def test_http_download(http_source_archive, target_dir, workspace):
     (http_source_archive.dir / 'test.txt').write_text('TEST')
     archive_url = http_source_archive.make_archive()
 
-    tarball = Tarball(source_dir=target_dir, url=archive_url)
-    tarball.update(cache_dir)
+    tarball = Tarball(source_dir=target_dir, url=archive_url, workspace=workspace)
+    tarball.update()
     assert (target_dir / 'test.txt').read_text() == 'TEST'
 
     http_source_archive.server.shutdown()
 
     shutil.rmtree(target_dir)
-    tarball.update(cache_dir)
+    tarball.update()
     assert (target_dir / 'test.txt').read_text() == 'TEST'

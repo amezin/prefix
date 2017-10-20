@@ -20,7 +20,7 @@ def cache_filename(url):
 class Tarball(SourceDir):
     url = Option(str)
 
-    def update(self, cache_dir, clean=False):
+    def update(self, clean=False):
         try:
             scheme, path = urllib.parse.splittype(self.url)
         except TypeError:
@@ -30,9 +30,9 @@ class Tarball(SourceDir):
         if scheme == 'file' or not scheme:
             downloaded = pathlib.Path(path)
         else:
-            cache_dir.mkdir(exist_ok=True)
+            self.workspace.cache_dir.mkdir(exist_ok=True)
 
-            downloaded = cache_dir / cache_filename(self.url)
+            downloaded = self.workspace.cache_dir / cache_filename(self.url)
             if not downloaded.exists():
                 urllib.request.urlretrieve(self.url, downloaded)
 
