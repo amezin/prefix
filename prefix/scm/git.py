@@ -93,8 +93,8 @@ class GitRepo(Config):
                 stashed = True
 
         try:
-            upstream = git.output('rev-parse', '--verify', '-q', '--symbolic-full-name', '@{u}')
-            upstream_id = git.output('rev-parse', '--verify', '-q', '@{u}')
+            upstream = git.output('rev-parse', '--verify', '-q', '--symbolic-full-name', '@{u}', stderr=subprocess.DEVNULL)
+            upstream_id = git.output('rev-parse', '--verify', '-q', '@{u}', stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
             upstream = None
             upstream_id = None
