@@ -7,7 +7,7 @@ import urllib.parse
 
 import pytest
 
-from prefix.scm.tarball import update
+from prefix.scm.tarball import Tarball
 
 
 class ArchiveFixture:
@@ -91,7 +91,7 @@ def test_local_extract_uri(source_archive, target_dir, cache_dir):
     (source_archive.dir / 'test.txt').write_text('TEST')
     archive = source_archive.make_archive()
 
-    update(target_dir, archive.as_uri(), cache_dir)
+    Tarball(source_dir=target_dir, url=archive.as_uri()).update(cache_dir)
 
     assert not cache_dir.exists()
     assert (target_dir / 'test.txt').read_text() == 'TEST'
@@ -101,7 +101,7 @@ def test_local_extract_file(source_archive, target_dir, cache_dir):
     (source_archive.dir / 'test.txt').write_text('TEST')
     archive = source_archive.make_archive()
 
-    update(target_dir, archive, cache_dir)
+    Tarball(source_dir=target_dir, url=archive.as_uri()).update(cache_dir)
 
     assert not cache_dir.exists()
     assert (target_dir / 'test.txt').read_text() == 'TEST'
@@ -111,11 +111,12 @@ def test_http_download(http_source_archive, target_dir, cache_dir):
     (http_source_archive.dir / 'test.txt').write_text('TEST')
     archive_url = http_source_archive.make_archive()
 
-    update(target_dir, archive_url, cache_dir)
+    tarball = Tarball(source_dir=target_dir, url=archive_url)
+    tarball.update(cache_dir)
     assert (target_dir / 'test.txt').read_text() == 'TEST'
 
     http_source_archive.server.shutdown()
 
     shutil.rmtree(target_dir)
-    update(target_dir, archive_url, cache_dir)
+    tarball.update(cache_dir)
     assert (target_dir / 'test.txt').read_text() == 'TEST'
