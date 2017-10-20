@@ -5,7 +5,7 @@ import shutil
 import urllib.parse
 import urllib.request
 
-from prefix.config import Config, Option
+from prefix.scm.dir import SourceDir, Option
 
 
 CACHE_FILENAME_PATTERN = re.compile(r'[^-._\d\w]', re.ASCII)
@@ -17,8 +17,7 @@ def cache_filename(url):
     return url_hash.hexdigest() + '_' + CACHE_FILENAME_PATTERN.sub('_', url)
 
 
-class Tarball(Config):
-    source_dir = Option(pathlib.Path)
+class Tarball(SourceDir):
     url = Option(str)
 
     def update(self, cache_dir, clean=False):

@@ -1,11 +1,10 @@
 import locale
 import logging
-import pathlib
 import shlex
 import subprocess
 import sys
 
-from prefix.config import Config, Option
+from prefix.scm.dir import SourceDir, Option
 
 
 LOG = logging.getLogger(__name__)
@@ -30,8 +29,7 @@ class GitTool:
         return self(*args, **kwargs).stdout.strip()
 
 
-class GitRepo(Config):
-    source_dir = Option(pathlib.Path)
+class GitRepo(SourceDir):
     url = Option(str)
     commit = Option(str, default='master')
     depth = Option(int, default=1)
