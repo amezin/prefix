@@ -3,10 +3,10 @@ import pathlib
 
 import pytest
 
-from prefix.scm.git import GitTool, update, DEFAULT_REMOTE
+from prefix.scm.git import GitTool, GitRepo
 
 
-class GitRepo(GitTool):
+class GitFixture(GitTool):
     def __init__(self, path):
         super().__init__(path)
         self.path = pathlib.Path(path)
@@ -26,190 +26,219 @@ class GitRepo(GitTool):
 
 
 @pytest.fixture
-def src_repo(tmpdir):
-    repo_dir = tmpdir / 'src_repo'
+def src_git(tmpdir):
+    repo_dir = tmpdir / 'src_git'
     repo_dir.mkdir()
-    repo = GitRepo(repo_dir)
-    repo('init', '-q')
-    return repo
+    git = GitFixture(repo_dir)
+    git('init', '-q')
+    return git
 
 
 @pytest.fixture
-def dst_repo(tmpdir):
-    return GitRepo(tmpdir / 'dst_repo')
+def dst_git(tmpdir):
+    return GitFixture(tmpdir / 'dst_git')
 
 
-def test_clone_then_pull(src_repo, dst_repo):
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE'})
-    update(dst_repo.path, src_repo.url)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE'
+def test_clone_then_pull(src_git, dst_git):
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url)
 
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE MODIFIED'})
-    update(dst_repo.path, src_repo.url)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE MODIFIED'
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE'})
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE'
+
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE MODIFIED'})
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE MODIFIED'
 
 
-def test_branch(src_repo, dst_repo):
-    master_head = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE from master'})
+def test_branch(src_git, dst_git):
+    master_head = src_git.add_commit('TEST', {'test.txt': 'TEST FILE from master'})
 
-    src_repo('checkout', '-b', 'test-branch')
-    test_branch_head = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE from test-branch'})
+    src_git('checkout', '-b', 'test-branch')
+    test_branch_head = src_git.add_commit('TEST', {'test.txt': 'TEST FILE from test-branch'})
 
-    update(dst_repo.path, src_repo.url, commit='test-branch')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE from test-branch'
-    assert dst_repo.output('rev-parse', 'refs/remotes/%s/test-branch' % DEFAULT_REMOTE) == test_branch_head
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url, commit='test-branch')
+    repo.update()
+
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE from test-branch'
+    assert dst_git.output('rev-parse', 'refs/remotes/%s/test-branch' % GitRepo.remote.default) == test_branch_head
     with pytest.raises(Exception):
-        dst_repo.output('rev-parse', 'refs/remotes/%s/master' % DEFAULT_REMOTE)
+        dst_git.output('rev-parse', 'refs/remotes/%s/master' % GitRepo.remote.default)
 
-    update(dst_repo.path, src_repo.url, commit='master')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE from master'
-    assert dst_repo.output('rev-parse', 'refs/remotes/%s/master' % DEFAULT_REMOTE) == master_head
+    repo.commit = 'master'
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE from master'
+    assert dst_git.output('rev-parse', 'refs/remotes/%s/master' % GitRepo.remote.default) == master_head
 
-    update(dst_repo.path, src_repo.url, commit='test-branch')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE from test-branch'
+    repo.commit = 'test-branch'
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE from test-branch'
 
-    test_branch_head = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE from test-branch 2'})
-    update(dst_repo.path, src_repo.url, commit='test-branch')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE from test-branch 2'
-    assert dst_repo.output('rev-parse', 'refs/remotes/%s/test-branch' % DEFAULT_REMOTE) == test_branch_head
+    test_branch_head = src_git.add_commit('TEST', {'test.txt': 'TEST FILE from test-branch 2'})
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE from test-branch 2'
+    assert dst_git.output('rev-parse', 'refs/remotes/%s/test-branch' % GitRepo.remote.default) == test_branch_head
 
 
-def test_tag(src_repo, dst_repo):
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE from tag'})
-    src_repo('tag', 'test-tag')
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE from master'})
+def test_tag(src_git, dst_git):
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE from tag'})
+    src_git('tag', 'test-tag')
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE from master'})
 
-    update(dst_repo.path, src_repo.url, commit='test-tag')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE from tag'
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url, commit='test-tag')
+    repo.update()
+
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE from tag'
     with pytest.raises(Exception):
-        dst_repo.output('rev-parse', 'refs/remotes/%s/master' % DEFAULT_REMOTE)
+        dst_git.output('rev-parse', 'refs/remotes/%s/master' % DEFAULT_REMOTE)
 
-    update(dst_repo.path, src_repo.url, commit='master')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE from master'
+    repo.commit = 'master'
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE from master'
 
-    update(dst_repo.path, src_repo.url, commit='test-tag')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE from tag'
-
-
-def test_sha(src_repo, dst_repo):
-    commit1 = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 1'})
-    commit2 = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 2'})
-
-    update(dst_repo.path, src_repo.url, commit=commit1)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 1'
-
-    update(dst_repo.path, src_repo.url, commit=commit2)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 2'
-
-    update(dst_repo.path, src_repo.url, commit=commit1)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 1'
+    repo.commit = 'test-tag'
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE from tag'
 
 
-def test_remote_fix(src_repo, dst_repo):
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 1'})
-    update(dst_repo.path, src_repo.url)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 1'
+def test_sha(src_git, dst_git):
+    commit1 = src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 1'})
+    commit2 = src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 2'})
 
-    dst_repo('remote', 'remove', DEFAULT_REMOTE)
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url, commit=commit1)
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 1'
 
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 2'})
-    update(dst_repo.path, src_repo.url)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 2'
+    repo.commit = commit2
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 2'
 
-    dst_repo('remote', 'set-url', DEFAULT_REMOTE, (src_repo.path.parent / 'non-existant-dir').as_uri())
-
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 3'})
-
-    with pytest.raises(Exception):
-        update(dst_repo.path, src_repo.url)
-
-    update(dst_repo.path, src_repo.url, clean=True)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 3'
+    repo.commit = commit1
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 1'
 
 
-def test_autostash(src_repo, dst_repo):
-    commit1 = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3'})
-    commit2 = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 2\nLine 2\nLine 3'})
+def test_remote_fix(src_git, dst_git):
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 1'})
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url)
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 1'
 
-    update(dst_repo.path, src_repo.url, commit=commit1)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 1\nLine 2\nLine 3'
+    dst_git('remote', 'remove', GitRepo.remote.default)
 
-    (dst_repo.path / 'test.txt').write_text('TEST FILE commit 1\nLine 2\nLine 3\nDIRTY')
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 2'})
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 2'
 
-    update(dst_repo.path, src_repo.url, commit=commit2)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 2\nLine 2\nLine 3\nDIRTY'
+    dst_git('remote', 'set-url', GitRepo.remote.default, (src_git.path.parent / 'non-existant-dir').as_uri())
 
-
-def test_same_commit(src_repo, dst_repo):
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3'})
-    commit2 = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 2\nLine 2\nLine 3'})
-
-    update(dst_repo.path, src_repo.url)
-    (dst_repo.path / 'test.txt').write_text('TEST FILE commit 1\nLine 2\nLine 3\nDIRTY')
-
-    old_stat = os.stat(src_repo.path / 'test.txt')
-
-    update(dst_repo.path, src_repo.url, commit=commit2)
-
-    assert os.stat(src_repo.path / 'test.txt') == old_stat
-
-
-def test_rollback_to_unfetched_sha(src_repo, dst_repo):
-    commit1 = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 1'})
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 2'})
-
-    update(dst_repo.path, src_repo.url, depth=1)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 2'
-
-    update(dst_repo.path, src_repo.url, commit=commit1)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 1'
-
-
-def test_clean(src_repo, dst_repo):
-    commit1 = src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3'})
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 2\nLine 2\nLine 3'})
-
-    update(dst_repo.path, src_repo.url)
-
-    (dst_repo.path / 'test.txt').write_text('TEST FILE commit 1\nLine 2\nLine 3\nDIRTY')
-    (dst_repo.path / 'test2.txt').write_text('TEST 2')
-
-    update(dst_repo.path, src_repo.url, commit=commit1, clean=True)
-
-    assert dst_repo.output('status', '--porcelain') == ''
-
-
-def test_commit_symbolic_name_clash(src_repo, dst_repo):
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 1'})
-
-    update(dst_repo.path, src_repo.url)
-    dst_repo('checkout', '-b', 'local-branch')
-    dst_repo('tag', 'local-tag')
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 3'})
 
     with pytest.raises(Exception):
-        update(dst_repo.path, src_repo.url, commit='local-branch')
+        repo.update()
+
+    repo.update(clean=True)
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 3'
+
+
+def test_autostash(src_git, dst_git):
+    commit1 = src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3'})
+    commit2 = src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 2\nLine 2\nLine 3'})
+
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url, commit=commit1)
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 1\nLine 2\nLine 3'
+
+    (dst_git.path / 'test.txt').write_text('TEST FILE commit 1\nLine 2\nLine 3\nDIRTY')
+
+    repo.commit = commit2
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 2\nLine 2\nLine 3\nDIRTY'
+
+
+def test_same_commit(src_git, dst_git):
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3'})
+    commit2 = src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 2\nLine 2\nLine 3'})
+
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url)
+    repo.update()
+    (dst_git.path / 'test.txt').write_text('TEST FILE commit 1\nLine 2\nLine 3\nDIRTY')
+
+    old_stat = os.stat(src_git.path / 'test.txt')
+
+    repo.commit = commit2
+    repo.update()
+
+    assert os.stat(src_git.path / 'test.txt') == old_stat
+
+
+def test_rollback_to_unfetched_sha(src_git, dst_git):
+    commit1 = src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 1'})
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 2'})
+
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url, depth=1)
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 2'
+
+    repo.commit = commit1
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 1'
+
+
+def test_clean(src_git, dst_git):
+    commit1 = src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3'})
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 2\nLine 2\nLine 3'})
+
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url)
+    repo.update()
+
+    (dst_git.path / 'test.txt').write_text('TEST FILE commit 1\nLine 2\nLine 3\nDIRTY')
+    (dst_git.path / 'test2.txt').write_text('TEST 2')
+
+    repo.commit = commit1
+    repo.update(clean=True)
+
+    assert dst_git.output('status', '--porcelain') == ''
+
+
+def test_commit_symbolic_name_clash(src_git, dst_git):
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 1'})
+
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url)
+    repo.update()
+
+    dst_git('checkout', '-b', 'local-branch')
+    dst_git('tag', 'local-tag')
 
     with pytest.raises(Exception):
-        update(dst_repo.path, src_repo.url, commit='local-tag')
+        repo.commit = 'local-branch'
+        repo.update()
+
+    with pytest.raises(Exception):
+        repo.commit = 'local-tag'
+        repo.update()
 
 
-def test_rebase(src_repo, dst_repo):
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3'})
-    update(dst_repo.path, src_repo.url)
-    dst_repo('checkout', 'master')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 1\nLine 2\nLine 3'
+def test_rebase(src_git, dst_git):
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3'})
+    repo = GitRepo(source_dir=dst_git.path, url=src_git.url)
+    repo.update()
+    dst_git('checkout', 'master')
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 1\nLine 2\nLine 3'
 
-    update(dst_repo.path, src_repo.url)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 1\nLine 2\nLine 3'
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 1\nLine 2\nLine 3'
 
-    dst_repo.add_commit('Append "DIRTY"', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3\nDIRTY'})
-    update(dst_repo.path, src_repo.url)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 1\nLine 2\nLine 3\nDIRTY'
+    dst_git.add_commit('Append "DIRTY"', {'test.txt': 'TEST FILE commit 1\nLine 2\nLine 3\nDIRTY'})
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 1\nLine 2\nLine 3\nDIRTY'
 
-    src_repo.add_commit('TEST', {'test.txt': 'TEST FILE commit 2\nLine 2\nLine 3'})
-    update(dst_repo.path, src_repo.url, depth=2)
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 2\nLine 2\nLine 3\nDIRTY'
+    src_git.add_commit('TEST', {'test.txt': 'TEST FILE commit 2\nLine 2\nLine 3'})
+    repo.depth = 2
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 2\nLine 2\nLine 3\nDIRTY'
 
-    src_repo('checkout', '-b', 'test-branch')
-    update(dst_repo.path, src_repo.url, commit='test-branch')
-    assert (dst_repo.path / 'test.txt').read_text() == 'TEST FILE commit 2\nLine 2\nLine 3'
+    src_git('checkout', '-b', 'test-branch')
+    repo.commit = 'test-branch'
+    repo.update()
+    assert (dst_git.path / 'test.txt').read_text() == 'TEST FILE commit 2\nLine 2\nLine 3'
