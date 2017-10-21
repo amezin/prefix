@@ -22,7 +22,6 @@ class Workspace(Config, collections.abc.MutableSet):
         return iter(self.__items)
 
     def add(self, value):
-        assert value.workspace is None
         value.workspace = self
         self.__items.add(value)
 
@@ -31,3 +30,29 @@ class Workspace(Config, collections.abc.MutableSet):
             value.workspace = None
 
         self.__items.discard(value)
+
+
+class Item(Config):
+    def __init__(self, *args, workspace=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.__workspace = None
+        if workspace is not None:
+            workspace.add(self)
+
+    @property
+    def workspace(self):
+        return self.__workspace
+
+    @workspace.setter
+    def workspace(self, value):
+        if value is self.__workspace:
+            return
+
+        if self.__workspace is not None:
+            self.__workspace = None
+            self.__workspace.remove(self)
+
+        if value is not None:
+            self.__workspace = value
+            value.add(self)
