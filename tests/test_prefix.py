@@ -15,7 +15,7 @@ def workspace(tmpdir, download_cache_dir):
 
 def test_glib(workspace):
     prefix.build_cmake('zlib', url='https://zlib.net/zlib-1.2.11.tar.gz', workspace=workspace)
-    prefix.build_autotools('libffi', url='ftp://sourceware.org/pub/libffi/libffi-3.2.1.tar.gz', workspace=workspace)
+    prefix.build_autotools('libffi', url='http://sourceware.org/pub/libffi/libffi-3.2.1.tar.gz', workspace=workspace)
     prefix.build_autotools('gettext', url='https://ftp.gnu.org/pub/gnu/gettext/gettext-0.19.8.tar.xz', workspace=workspace)
     prefix.build_autotools('pcre', url='https://ftp.pcre.org/pub/pcre/pcre-8.41.tar.bz2', workspace=workspace,
                            deps=['zlib'], extra_configure_args=['--enable-unicode-properties'])
